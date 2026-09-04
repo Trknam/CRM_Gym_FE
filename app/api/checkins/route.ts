@@ -1,0 +1,15 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
+import { requirePermission, getAccessibleBranchIds } from "@/lib/auth/authorization";
+import { defaultBranchId } from "@/lib/api/branches";
+import { apiErrorFromUnknown } from "@/lib/api/response";
+
+const methodMap: Record<string, "QR_CODE" | "FRONT_DESK"> = { "QR Code": "QR_CODE", "Quầy lễ tân": "FRONT_DESK" };
+const statusMap: Record<string, "VALID" | "REJECTED"> = { "Hợp lệ": "VALID", "Từ chối": "REJECTED" };
+const methodLabel = { QR_CODE: "QR Code", FRONT_DESK: "Quầy lễ tân" };
+const statusLabel = { VALID: "Hợp lệ", REJECTED: "Từ chối" };
+const out = (x: any) => ({ id: x.id, member: x.member.fullName, memberId: x.memberId, time: x.checkedInAt.toISOString(), method: methodLabel[x.method as keyof typeof methodLabel], status: statusLabel[x.status as keyof typeof statusLabel] });
+
+export async function GET() { try { await requirePermission("checkin.read"); const ids = await getAccessibleBranchIds(); const rows = await prisma.checkIn.findMany({ where: ids === null ? {} : { branchId: { in: ids } }, include: { member: true }, orderBy: { checkedInAt: "desc" } }); return NextResponse.json({ data: rows.map(out) }); } catch (e) { return apiErrorFromUnknown(e, "Không thể lấy lịch sử check-in."); } }
+export async function POST(request: Request) { try { await requirePermission("checkin.create"); const b = await request.json(); const memberId = String(b.memberId ?? "").trim(); const branchId = String(b.branchId ?? await defaultBranchId()).trim(); const member = await prisma.member.findFirst({ where: { id: memberId, ...(branchId ? { branchId } : {}) }, include: { memberships: { where: { status: "ACTIVE" }, orderBy: { endDate: "desc" }, take: 1 } } }); if (!member) return NextResponse.json({ message: "Không tìm thấy hội viên." }, { status: 404 }); const row = await prisma.checkIn.create({ data: { branchId: member.branchId, memberId, checkedInAt: b.time ? new Date(b.time) : new Date(), method: methodMap[String(b.method)] ?? "FRONT_DESK", status: statusMap[String(b.status)] ?? (member.memberships.length ? "VALID" : "REJECTED") }, include: { member: true } }); return NextResponse.json({ data: out(row) }, { status: 201 }); } catch (e) { return apiErrorFromUnknown(e, "Không thể tạo check-in."); } }
+export async function DELETE(request: Request) { try { await requirePermission("checkin.create"); const b = await request.json(); const ids = await getAccessibleBranchIds(); const row = await prisma.checkIn.findFirst({ where: { id: String(b.id), ...(ids === null ? {} : { branchId: { in: ids } }) } }); if (!row) return NextResponse.json({ message: "Không tìm thấy lượt check-in." }, { status: 404 }); await prisma.checkIn.delete({ where: { id: row.id } }); return NextResponse.json({ message: "Đã xóa lượt check-in." }); } catch (e) { return apiErrorFromUnknown(e, "Không thể xóa check-in."); } }

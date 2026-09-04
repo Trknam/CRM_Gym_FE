@@ -1,4 +1,5 @@
 import { Bell, Search } from "lucide-react";
+import { UserMenu } from "@/components/auth/user-menu";
 
 export function Header() {
   return (
@@ -16,13 +17,7 @@ export function Header() {
           <Bell size={18} />
           <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
         </button>
-        <div className="hidden items-center gap-2 sm:flex">
-          <div className="grid h-9 w-9 place-items-center rounded-full bg-[#e8e7ff] text-sm font-bold text-[#635bff]">A</div>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold">Admin</div>
-            <div className="text-[11px] text-[#98a2b3]">Manager</div>
-          </div>
-        </div>
+        <UserMenu />
       </div>
     </header>
   );

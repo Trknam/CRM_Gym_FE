@@ -8,5 +8,6 @@ WORKDIR /app
 ENV NODE_ENV=development
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN npx prisma generate
 EXPOSE 3000
 CMD ["npm", "run", "dev"]

@@ -1,26 +1,21 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
 import { requirePermission, getAccessibleBranchIds } from "@/lib/auth/authorization";
 import { apiErrorFromUnknown } from "@/lib/api/response";
+import { getDashboardMetrics } from "@/lib/dashboard/dashboard-metrics";
 
 export async function GET() {
   try {
     await requirePermission("report.read");
     const ids = await getAccessibleBranchIds();
-    const branchWhere = ids === null ? {} : { branchId: { in: ids } };
-    const [members, activeMemberships, payments, checkIns, leads, paidPayments] = await Promise.all([
-      prisma.member.count({ where: branchWhere }),
-      prisma.membership.count({ where: { status: "ACTIVE", member: branchWhere } }),
-      prisma.payment.aggregate({ where: { ...branchWhere, status: "PAID" }, _sum: { amount: true } }),
-      prisma.checkIn.count({ where: { ...branchWhere, status: "VALID" } }),
-      prisma.lead.count({ where: branchWhere }),
-      prisma.payment.count({ where: { ...branchWhere, status: "PAID" } }),
-    ]);
+    const metrics = await getDashboardMetrics(ids);
     const data = [
-      { id: "revenue", name: "Doanh thu", type: "Doanh thu", period: "Tất cả thời gian", status: `${Number(payments._sum.amount ?? 0).toLocaleString("vi-VN")} VNĐ` },
-      { id: "members", name: "Hội viên", type: "Hội viên", period: "Hiện tại", status: `${members} hội viên / ${activeMemberships} membership active` },
-      { id: "checkins", name: "Check-in", type: "Check-in", period: "Tất cả thời gian", status: `${checkIns} lượt hợp lệ` },
-      { id: "leads", name: "Leads", type: "Leads", period: "Hiện tại", status: `${leads} Lead / ${paidPayments} giao dịch đã thanh toán` },
+      { id: "revenue-month", name: "Doanh thu tháng", type: "Doanh thu", period: "Tháng hiện tại", status: `${metrics.finance.monthRevenue.toLocaleString("vi-VN")} VNĐ` },
+      { id: "revenue-total", name: "Tổng doanh thu", type: "Doanh thu", period: "Tất cả thời gian", status: `${metrics.finance.allTimeRevenue.toLocaleString("vi-VN")} VNĐ` },
+      { id: "collection", name: "Đã thu", type: "Thanh toán", period: "Khoản đã thanh toán", status: `${metrics.finance.allTimeRevenue.toLocaleString("vi-VN")} VNĐ` },
+      { id: "due", name: "Còn phải thu", type: "Thanh toán", period: "Giao dịch chờ thanh toán", status: `${metrics.finance.pendingAmount.toLocaleString("vi-VN")} VNĐ` },
+      { id: "members", name: "Hội viên", type: "Hội viên", period: "Hiện tại", status: `${metrics.members.total} hội viên / ${metrics.members.active} đang hoạt động` },
+      { id: "checkins", name: "Check-in", type: "Check-in", period: "7 ngày gần nhất", status: `${metrics.attendance.last7Days} lượt hợp lệ` },
+      { id: "leads", name: "CRM", type: "Leads", period: "Cần xử lý", status: `${metrics.crm.dueFollowUps} follow-up / ${metrics.crm.inactive14Days} hội viên ít hoạt động` },
     ];
     return NextResponse.json({ data });
   } catch (e) { return apiErrorFromUnknown(e, "Không thể tạo báo cáo từ dữ liệu PostgreSQL."); }

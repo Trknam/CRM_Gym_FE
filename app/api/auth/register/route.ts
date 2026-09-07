@@ -42,6 +42,21 @@ export async function POST(request: Request) {
       select: { id: true, fullName: true, email: true, phone: true, role: true },
     });
 
+    // Tài khoản nhân viên phải thuộc ít nhất một chi nhánh để branch-scope
+    // có thể trả về dữ liệu. Tài khoản đăng ký mới được gán vào chi nhánh
+    // đang hoạt động đầu tiên; quản trị viên vẫn có thể đổi phân công sau.
+    const defaultBranch = await prisma.branch.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+
+    if (defaultBranch) {
+      await prisma.userBranch.create({
+        data: { userId: user.id, branchId: defaultBranch.id },
+      });
+    }
+
     await createSession(user.id);
     return NextResponse.json({ user }, { status: 201 });
   } catch {

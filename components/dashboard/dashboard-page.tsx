@@ -1,116 +1,53 @@
 import Link from "next/link";
-import { Users, CreditCard, QrCode, UserRoundPlus, Sparkles, UserCog, Building2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, CreditCard, Dumbbell, QrCode, Sparkles, TrendingUp, UserRoundPlus, Users } from "lucide-react";
 import { PageTitle } from "@/components/ui/page-title";
 import { StatCard } from "@/components/ui/stat-card";
 import { RevenueChart } from "@/components/dashboard/revenue-chart";
-import { CrmAlerts } from "@/components/dashboard/crm-alerts";
 import { RecentMembers } from "@/components/dashboard/recent-members";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAccessibleBranchIds } from "@/lib/auth/authorization";
-import { prisma } from "@/lib/db/prisma";
+import { getDashboardMetrics, getVietnamDateRange } from "@/lib/dashboard/dashboard-metrics";
 
-function formatMoney(amount: number): string {
-  if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(1)}B`;
-  if (amount >= 1_000_000) return `${Math.round(amount / 1_000_000)}M`;
-  if (amount >= 1_000) return `${Math.round(amount / 1_000)}K`;
-  return `${Math.round(amount)}`;
+function money(value: number) { return `${Math.round(value).toLocaleString("vi-VN")} VNĐ`; }
+
+function Action({ href, icon: Icon, title, detail }: { href: string; icon: typeof Users; title: string; detail: string }) {
+  return <Link href={href} className="group flex items-center gap-3 rounded-xl border border-[#eef0f4] p-3 transition hover:border-[#d8d5ff] hover:bg-[#fafaff]"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#f1f0ff] text-[#635bff]"><Icon size={17}/></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{title}</span><span className="block truncate text-xs text-[#98a2b3]">{detail}</span></span><ArrowRight size={16} className="text-[#98a2b3] transition group-hover:translate-x-0.5 group-hover:text-[#635bff]"/></Link>;
 }
 
 export async function DashboardPage() {
   const user = await getCurrentUser();
   const branchIds = await getAccessibleBranchIds();
-  const branchFilter = branchIds === null ? {} : { branchId: { in: branchIds } };
+  const metrics = await getDashboardMetrics(branchIds);
+  const { startOfToday } = getVietnamDateRange();
   const displayName = user?.fullName?.trim() || "bạn";
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const sevenDaysFromNow = new Date(startOfToday);
-  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-  const fourteenDaysAgo = new Date(startOfToday);
-  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-
-  const [
-    totalMembers,
-    activeMembers,
-    todayCheckIns,
-    monthlyRevenue,
-    employeeCount,
-    trainerCount,
-    branchCount,
-    expiringMemberships,
-    inactiveMembers,
-    pendingLeads,
-    recentMembers,
-  ] = await Promise.all([
-    prisma.member.count({ where: branchFilter }),
-    prisma.member.count({
-      where: {
-        ...branchFilter,
-        status: "ACTIVE",
-        memberships: { some: { status: "ACTIVE", endDate: { gte: now } } },
-      },
-    }),
-    prisma.checkIn.count({ where: { ...branchFilter, checkedInAt: { gte: startOfToday }, status: "VALID" } }),
-    prisma.payment.aggregate({
-      where: { ...branchFilter, status: "PAID", paidAt: { gte: startOfMonth } },
-      _sum: { amount: true },
-    }),
-    prisma.user.count({
-      where: {
-        isActive: true,
-        role: { in: ["BRANCH_MANAGER", "STAFF"] },
-        ...(branchIds === null ? {} : { userBranches: { some: { branchId: { in: branchIds } } } }),
-      },
-    }),
-    prisma.user.count({
-      where: {
-        isActive: true,
-        role: "TRAINER",
-        ...(branchIds === null ? {} : { userBranches: { some: { branchId: { in: branchIds } } } }),
-      },
-    }),
-    prisma.branch.count({ where: branchIds === null ? { isActive: true } : { id: { in: branchIds }, isActive: true } }),
-    prisma.membership.count({
-      where: { member: branchFilter, status: "ACTIVE", endDate: { gte: now, lte: sevenDaysFromNow } },
-    }),
-    prisma.member.count({
-      where: {
-        ...branchFilter,
-        status: "ACTIVE",
-        memberships: { some: { status: "ACTIVE", endDate: { gte: now } } },
-        checkIns: { none: { status: "VALID", checkedInAt: { gte: fourteenDaysAgo } } },
-      },
-    }),
-    prisma.lead.count({
-      where: { ...branchFilter, status: { in: ["NEW", "POTENTIAL"] }, nextFollowUpAt: { lte: now } },
-    }),
-    prisma.member.findMany({
-      where: branchFilter,
-      orderBy: { updatedAt: "desc" },
-      take: 5,
-      include: { memberships: { orderBy: { endDate: "desc" }, take: 1, include: { package: true } } },
-    }),
-  ]);
 
   const stats = [
-    { label: "Tổng hội viên", value: totalMembers.toLocaleString("vi-VN"), change: "Thực tế", icon: Users, href: "/members" },
-    { label: "Đang hoạt động", value: activeMembers.toLocaleString("vi-VN"), change: "Có gói còn hạn", icon: Users, href: "/members" },
-    { label: "Check-in hôm nay", value: todayCheckIns.toLocaleString("vi-VN"), change: "Hôm nay", icon: QrCode, href: "/checkin" },
-    { label: "Doanh thu tháng", value: `${formatMoney(Number(monthlyRevenue._sum.amount ?? 0))}`, change: "Đã thanh toán", icon: CreditCard, href: "/payments" },
-    { label: "Nhân viên", value: employeeCount.toLocaleString("vi-VN"), change: "Đang hoạt động", icon: UserCog, href: "/settings" },
-    { label: "PT / Trainer", value: trainerCount.toLocaleString("vi-VN"), change: "Đang hoạt động", icon: UserRoundPlus, href: "/trainers" },
-    { label: "Chi nhánh", value: branchCount.toLocaleString("vi-VN"), change: "Đang hoạt động", icon: Building2, href: "/settings" },
+    { label: "Hội viên", value: metrics.members.total.toLocaleString("vi-VN"), change: `${metrics.members.active} đang hoạt động`, icon: Users, href: "/members" },
+    { label: "Check-in hôm nay", value: metrics.today.checkIns.toLocaleString("vi-VN"), change: `${metrics.attendance.last7Days} lượt / 7 ngày`, icon: QrCode, href: "/checkin" },
+    { label: "Doanh thu tháng", value: money(metrics.finance.monthRevenue), change: `${metrics.today.paidTransactions} giao dịch hôm nay`, icon: CreditCard, href: "/payments" },
+    { label: "Cần follow-up", value: metrics.crm.dueFollowUps.toLocaleString("vi-VN"), change: "Cần xử lý", icon: UserRoundPlus, href: "/crm" },
   ];
 
   return <>
-    <PageTitle title="Dashboard" description="Tổng quan hoạt động phòng Gym"
-      action={<Link href="/ai-workout" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#635bff] px-4 py-2.5 text-sm font-semibold text-white"><Sparkles size={17}/>Tạo AI Workout</Link>}
-    />
+    <PageTitle title="Dashboard" description="Trung tâm điều hành hoạt động phòng Gym" action={<Link href="/ai-workout" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#635bff] px-4 py-2.5 text-sm font-semibold text-white"><Sparkles size={17}/>Tạo AI Workout</Link>}/>
     <div className="px-5 pb-8 md:px-8">
-      <div className="mb-6"><h3 className="text-xl font-bold">Chào buổi sáng, {displayName} 👋</h3><p className="mt-1 text-sm text-[#667085]">Đây là tình hình hoạt động hôm nay.</p></div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{stats.map((s) => <StatCard key={s.label} {...s}/>)}</div>
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]"><RevenueChart branchIds={branchIds}/><CrmAlerts expiringCount={expiringMemberships} inactiveCount={inactiveMembers} leadCount={pendingLeads}/></div>
-      <RecentMembers members={recentMembers.map((member) => ({ name: member.fullName, phone: member.phone, packageName: member.memberships[0]?.package.name ?? "Chưa có gói", expiry: member.memberships[0]?.endDate ?? null }))}/>
+      <div className="mb-6"><h3 className="text-xl font-bold">Chào buổi sáng, {displayName} 👋</h3><p className="mt-1 text-sm text-[#667085]">Tổng quan ngày {startOfToday.toLocaleDateString("vi-VN")}. Số liệu lấy trực tiếp từ PostgreSQL.</p></div>
+
+      <section><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold uppercase tracking-wide text-[#667085]">Hôm nay</h2><span className="text-xs text-[#98a2b3]">Live từ dữ liệu hệ thống</span></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{stats.map((s) => <StatCard key={s.label} {...s}/>)}</div></section>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+        <RevenueChart values={metrics.revenueByMonth}/>
+        <section className="card p-5"><div className="mb-4"><h3 className="font-bold">Cảnh báo & hành động</h3><p className="text-xs text-[#98a2b3]">Những việc nhân viên nên xử lý trước</p></div><div className="space-y-3"><Action href="/members" icon={CalendarClock} title={`${metrics.members.expiring7Days} hội viên sắp hết hạn`} detail="Trong 7 ngày tới"/><Action href="/members" icon={AlertTriangle} title={`${metrics.crm.inactive14Days} hội viên ít hoạt động`} detail="Không check-in trong 14 ngày"/><Action href="/crm" icon={UserRoundPlus} title={`${metrics.crm.dueFollowUps} Lead cần follow-up`} detail="Đến hạn liên hệ"/></div></section>
+      </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_.85fr]">
+        <section className="card p-5"><div className="mb-5 flex items-center justify-between"><div><h3 className="font-bold">Tình hình hội viên</h3><p className="text-xs text-[#98a2b3]">Trạng thái membership hiện tại</p></div><Link href="/members" className="text-xs font-semibold text-[#635bff]">Quản lý hội viên</Link></div><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl border border-[#eef0f4] p-4"><div className="flex items-center gap-2 text-sm text-[#667085]"><CheckCircle2 size={16} className="text-emerald-600"/>Đang hoạt động</div><div className="mt-2 text-2xl font-bold">{metrics.members.active}</div><div className="mt-1 text-xs text-[#98a2b3]">Có gói còn hạn</div></div><div className="rounded-xl border border-[#eef0f4] p-4"><div className="flex items-center gap-2 text-sm text-[#667085]"><AlertTriangle size={16} className="text-amber-600"/>Sắp hết hạn</div><div className="mt-2 text-2xl font-bold">{metrics.members.expiring7Days}</div><div className="mt-1 text-xs text-[#98a2b3]">Trong 7 ngày</div></div><div className="rounded-xl border border-[#eef0f4] p-4"><div className="flex items-center gap-2 text-sm text-[#667085]"><TrendingUp size={16}/>Mới hôm nay</div><div className="mt-2 text-2xl font-bold">{metrics.today.newMembers}</div><div className="mt-1 text-xs text-[#98a2b3]">Hội viên mới</div></div><div className="rounded-xl border border-[#eef0f4] p-4"><div className="flex items-center gap-2 text-sm text-[#667085]"><Users size={16}/>Đã hết hạn</div><div className="mt-2 text-2xl font-bold">{metrics.members.expired}</div><div className="mt-1 text-xs text-[#98a2b3]">Membership hết hạn</div></div></div></section>
+        <section className="card p-5"><div className="mb-5 flex items-center justify-between"><div><h3 className="font-bold">Tài chính</h3><p className="text-xs text-[#98a2b3]">Cùng một nguồn dữ liệu với Báo cáo</p></div><Link href="/reports" className="text-xs font-semibold text-[#635bff]">Xem báo cáo</Link></div><div className="space-y-4"><div className="flex items-center justify-between border-b border-[#eef0f4] pb-4"><span className="text-sm text-[#667085]">Doanh thu tháng</span><strong className="text-sm">{money(metrics.finance.monthRevenue)}</strong></div><div className="flex items-center justify-between border-b border-[#eef0f4] pb-4"><span className="text-sm text-[#667085]">Tổng doanh thu</span><strong className="text-sm">{money(metrics.finance.allTimeRevenue)}</strong></div><div className="flex items-center justify-between"><span className="text-sm text-[#667085]">Còn phải thu</span><strong className="text-sm">{money(metrics.finance.pendingAmount)}</strong></div></div></section>
+      </div>
+
+      <div className="mt-6"><RecentMembers members={metrics.recentMembers}/></div>
+
+      <section className="mt-6 card p-5"><div className="mb-4 flex items-center gap-2"><Dumbbell size={18} className="text-[#635bff]"/><div><h3 className="font-bold">Thao tác nhanh</h3><p className="text-xs text-[#98a2b3]">Đi thẳng tới nghiệp vụ thường dùng</p></div></div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Action href="/members" icon={Users} title="Thêm hội viên" detail="Tạo hồ sơ hội viên mới"/><Action href="/payments" icon={CreditCard} title="Ghi nhận thanh toán" detail="Tạo giao dịch mới"/><Action href="/checkin" icon={QrCode} title="Check-in" detail="Ghi nhận lượt vào gym"/><Action href="/ai-workout" icon={Sparkles} title="AI Workout" detail="Tạo và lưu lịch tập"/></div></section>
     </div>
   </>;
 }

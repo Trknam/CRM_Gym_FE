@@ -24,6 +24,12 @@ export type Permission =
   | "trainer.read"
   | "trainer.create"
   | "trainer.update"
+  | "exercise.read"
+  | "exercise.create"
+  | "exercise.update"
+  | "exercise.delete"
+  | "workout.read"
+  | "workout.generate"
   | "report.read"
   | "settings.read"
   | "settings.update";
@@ -58,6 +64,12 @@ export const ROLE_PERMISSIONS: Record<
     "trainer.read",
     "trainer.create",
     "trainer.update",
+    "exercise.read",
+    "exercise.create",
+    "exercise.update",
+    "exercise.delete",
+    "workout.read",
+    "workout.generate",
     "report.read",
     "settings.read",
     "settings.update",
@@ -86,6 +98,12 @@ export const ROLE_PERMISSIONS: Record<
     "trainer.read",
     "trainer.create",
     "trainer.update",
+    "exercise.read",
+    "exercise.create",
+    "exercise.update",
+    "exercise.delete",
+    "workout.read",
+    "workout.generate",
     "report.read",
     "settings.read",
   ],
@@ -103,6 +121,12 @@ export const ROLE_PERMISSIONS: Record<
     "checkin.read",
     "checkin.create",
     "trainer.read",
+    "exercise.read",
+    "exercise.create",
+    "exercise.update",
+    "exercise.delete",
+    "workout.read",
+    "workout.generate",
     "report.read",
   ],
 
@@ -112,6 +136,9 @@ export const ROLE_PERMISSIONS: Record<
     "checkin.read",
     "checkin.create",
     "trainer.read",
+    "exercise.read",
+    "workout.read",
+    "workout.generate",
     "report.read",
   ],
 };

@@ -71,12 +71,13 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  sessions      Session[]
-  userBranches  UserBranch[]
+  sessions       Session[]
+  userBranches   UserBranch[]
   trainerProfile TrainerProfile?
-  createdLeads  Lead[] @relation("LeadCreatedBy")
-  updatedLeads  Lead[] @relation("LeadUpdatedBy")
-  crmActivities CrmActivity[]
+  createdLeads   Lead[]          @relation("LeadCreatedBy")
+  updatedLeads   Lead[]          @relation("LeadUpdatedBy")
+  crmActivities  CrmActivity[]
+  workoutPlans   WorkoutPlan[]
 
   @@index([role])
   @@index([isActive])
@@ -93,14 +94,15 @@ model Branch {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  userBranches UserBranch[]
-  members      Member[]
-  packages     GymPackage[]
-  leads        Lead[]
-  checkIns     CheckIn[]
-  payments     Payment[]
+  userBranches  UserBranch[]
+  members       Member[]
+  packages      GymPackage[]
+  leads         Lead[]
+  checkIns      CheckIn[]
+  payments      Payment[]
   crmActivities CrmActivity[]
   settings      GymSetting[]
+  workoutPlans  WorkoutPlan[]
 
   @@index([isActive])
 }
@@ -146,11 +148,12 @@ model Member {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  memberships  Membership[]
-  payments     Payment[]
-  checkIns     CheckIn[]
+  branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  memberships   Membership[]
+  payments      Payment[]
+  checkIns      CheckIn[]
   crmActivities CrmActivity[]
+  workoutPlans  WorkoutPlan[]
 
   @@index([branchId])
   @@index([status])
@@ -159,16 +162,16 @@ model Member {
 }
 
 model GymPackage {
-  id          String        @id @default(cuid())
-  branchId    String
-  code        String
-  name        String
+  id           String        @id @default(cuid())
+  branchId     String
+  code         String
+  name         String
   durationDays Int
-  price       Decimal       @db.Decimal(12, 2)
-  description String?
-  status      PackageStatus @default(ACTIVE)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  price        Decimal       @db.Decimal(12, 2)
+  description  String?
+  status       PackageStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   branch      Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
   memberships Membership[]
@@ -179,16 +182,16 @@ model GymPackage {
 }
 
 model Membership {
-  id          String           @id @default(cuid())
-  memberId    String
-  packageId   String
-  startDate   DateTime
-  endDate     DateTime
-  price       Decimal          @db.Decimal(12, 2)
-  status      MembershipStatus @default(ACTIVE)
-  note        String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id        String           @id @default(cuid())
+  memberId  String
+  packageId String
+  startDate DateTime
+  endDate   DateTime
+  price     Decimal          @db.Decimal(12, 2)
+  status    MembershipStatus @default(ACTIVE)
+  note      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   member   Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
   package  GymPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
@@ -224,13 +227,13 @@ model Payment {
 }
 
 model CheckIn {
-  id         String        @id @default(cuid())
-  branchId   String
-  memberId   String
+  id          String        @id @default(cuid())
+  branchId    String
+  memberId    String
   checkedInAt DateTime
-  method     CheckInMethod
-  status     CheckInStatus @default(VALID)
-  createdAt  DateTime      @default(now())
+  method      CheckInMethod
+  status      CheckInStatus @default(VALID)
+  createdAt   DateTime      @default(now())
 
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
   member Member @relation(fields: [memberId], references: [id], onDelete: Restrict)
@@ -255,9 +258,9 @@ model Lead {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  branch    Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  createdBy User?  @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy User?  @relation("LeadUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  createdBy     User?         @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy     User?         @relation("LeadUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   crmActivities CrmActivity[]
 
   @@index([branchId])
@@ -266,13 +269,13 @@ model Lead {
 }
 
 model TrainerProfile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  specialty   String?
-  bio         String?
-  hourlyRate  Decimal? @db.Decimal(12, 2)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  specialty  String?
+  bio        String?
+  hourlyRate Decimal? @db.Decimal(12, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -303,10 +306,10 @@ model CrmActivity {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  branch    Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branch    Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
   member    Member? @relation(fields: [memberId], references: [id], onDelete: SetNull)
-  lead      Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  lead      Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([branchId, status])
   @@index([memberId])
@@ -315,15 +318,16 @@ model CrmActivity {
 }
 
 model Exercise {
-  id          String   @id @default(cuid())
-  name        String
-  muscle      String
-  equipment   String?
-  level       String
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String            @id @default(cuid())
+  name             String
+  muscle           String
+  equipment        String?
+  level            String
+  description      String?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  workoutExercises WorkoutExercise[]
 
   @@index([muscle])
   @@index([level])
@@ -340,7 +344,67 @@ model GymSetting {
   updatedAt DateTime @updatedAt
 
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
   @@unique([branchId, name])
   @@index([branchId, group])
 }
 
+model WorkoutPlan {
+  id              String   @id @default(cuid())
+  branchId        String
+  memberId        String
+  createdById     String?
+  goal            String
+  level           String
+  sessionsPerWeek Int
+  durationMinutes Int
+  equipment       String
+  preferences     String?
+  notes           String?
+  aiModel         String
+  aiResponseId    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  branch    Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  member    Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdBy User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  days      WorkoutDay[]
+
+  @@index([branchId, createdAt])
+  @@index([memberId, createdAt])
+}
+
+model WorkoutDay {
+  id            String   @id @default(cuid())
+  workoutPlanId String
+  dayNumber     Int
+  dayName       String
+  title         String
+  focus         String
+  createdAt     DateTime @default(now())
+
+  workoutPlan WorkoutPlan       @relation(fields: [workoutPlanId], references: [id], onDelete: Cascade)
+  exercises   WorkoutExercise[]
+
+  @@index([workoutPlanId, dayNumber])
+}
+
+model WorkoutExercise {
+  id              String   @id @default(cuid())
+  workoutDayId    String
+  exerciseId      String
+  sortOrder       Int
+  sets            Int?
+  reps            Int?
+  durationMinutes Int?
+  restSeconds     Int?
+  note            String?
+  createdAt       DateTime @default(now())
+
+  workoutDay WorkoutDay @relation(fields: [workoutDayId], references: [id], onDelete: Cascade)
+  exercise   Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@unique([workoutDayId, sortOrder])
+  @@index([exerciseId])
+}

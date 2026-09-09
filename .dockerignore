@@ -6,3 +6,9 @@ npm-debug.log*
 Dockerfile
 docker-compose.yml
 README.md
+apps/*/node_modules
+packages/*/node_modules
+**/.next
+**/dist
+**/.turbo
+*.log

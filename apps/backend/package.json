@@ -12,11 +12,12 @@
   "dependencies": {
     "@gym-crm/shared": "workspace:*",
     "@prisma/client": "^6.19.0",
+    "@valkey/valkey-glide": "^2.5.2",
     "bcryptjs": "^3.0.3",
-    "cors": "^2.8.5",
     "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
     "express": "^5.1.0",
-    "@valkey/valkey-glide": "^2.5.2"
+    "ollama": "^0.6.3"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.9",

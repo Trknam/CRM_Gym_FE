@@ -40,7 +40,7 @@ exports.packagesRoutes.post("/", async (req, res) => {
         const branchId = await (0, branches_1.defaultBranchId)(req);
         const duration = Number(b.duration);
         const price = Number(b.price);
-        if (!branchId || !String(b.name ?? "").trim() || !duration || !Number.isFinite(price))
+        if (!branchId || !String(b.name ?? "").trim() || !Number.isInteger(duration) || duration <= 0 || !Number.isFinite(price) || price < 0)
             return res.status(400).json({ message: "Thông tin gói tập không hợp lệ." });
         if (ids !== null && !ids.includes(branchId))
             return res.status(403).json({ message: "Bạn không có quyền tại chi nhánh này." });
@@ -64,7 +64,11 @@ exports.packagesRoutes.patch("/", async (req, res) => {
         const existing = await prisma_1.prisma.gymPackage.findFirst({ where: { id: String(b.id), ...(ids === null ? {} : { branchId: { in: ids } }) } });
         if (!existing)
             return res.status(404).json({ message: "Không tìm thấy gói tập." });
-        const row = await prisma_1.prisma.gymPackage.update({ where: { id: existing.id }, data: { name: String(b.name ?? existing.name).trim(), durationDays: Number(b.duration ?? existing.durationDays / 30) * 30, price: Number(b.price ?? existing.price), status: b.status === "Tạm dừng" ? "INACTIVE" : "ACTIVE" } });
+        const duration = Number(b.duration ?? existing.durationDays / 30);
+        const price = Number(b.price ?? existing.price);
+        if (!String(b.name ?? existing.name).trim() || !Number.isInteger(duration) || duration <= 0 || !Number.isFinite(price) || price < 0)
+            return res.status(400).json({ message: "Thông tin gói tập không hợp lệ." });
+        const row = await prisma_1.prisma.gymPackage.update({ where: { id: existing.id }, data: { name: String(b.name ?? existing.name).trim(), durationDays: duration * 30, price, status: b.status === "Tạm dừng" ? "INACTIVE" : "ACTIVE" } });
         await (0, valkey_1.cacheDelete)(keys_1.cacheKeys.packages("all", "all"));
         return res.json({ data: map(row) });
     }

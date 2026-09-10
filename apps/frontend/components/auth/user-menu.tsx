@@ -1,30 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { LogOut } from "lucide-react";
 import { getRoleLabel } from "@/lib/auth/role-labels";
-
-type CurrentUser = {
-  fullName: string;
-  role: "SUPER_ADMIN" | "BRANCH_MANAGER" | "STAFF" | "TRAINER";
-};
+import { useAuth } from "@/components/auth/auth-context";
 
 export function UserMenu() {
-  const [user, setUser] = useState<CurrentUser | null>(null);
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((response) => response.ok ? response.json() : null)
-      .then((data) => data?.user && setUser(data.user))
-      .catch(() => undefined);
-  }, []);
+  const { user } = useAuth();
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include", cache: "no-store" });
+    } finally {
+      window.location.replace("/login");
+    }
   }
-
-  if (!user) return null;
 
   const roleLabel = getRoleLabel(user.role);
   const initial = user.fullName.trim().charAt(0).toUpperCase() || "U";

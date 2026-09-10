@@ -29,7 +29,7 @@ packagesRoutes.post("/", async (req, res) => {
     const b = req.body ?? {}; const ids = await getAccessibleBranchIds(req);
     const branchId = await defaultBranchId(req);
     const duration = Number(b.duration); const price = Number(b.price);
-    if (!branchId || !String(b.name ?? "").trim() || !duration || !Number.isFinite(price)) return res.status(400).json({ message: "Thông tin gói tập không hợp lệ." });
+    if (!branchId || !String(b.name ?? "").trim() || !Number.isInteger(duration) || duration <= 0 || !Number.isFinite(price) || price < 0) return res.status(400).json({ message: "Thông tin gói tập không hợp lệ." });
     if (ids !== null && !ids.includes(branchId)) return res.status(403).json({ message: "Bạn không có quyền tại chi nhánh này." });
     const count = await prisma.gymPackage.count({ where: { branchId } });
     const row = await prisma.gymPackage.create({ data: { branchId, code: `PKG-${String(count + 1).padStart(4, "0")}`, name: String(b.name).trim(), durationDays: duration * 30, price, status: b.status === "Tạm dừng" ? "INACTIVE" : "ACTIVE" } });
@@ -42,7 +42,9 @@ packagesRoutes.patch("/", async (req, res) => {
     await requirePermission(req, "package.update"); const b = req.body ?? {}; const ids = await getAccessibleBranchIds(req);
     const existing = await prisma.gymPackage.findFirst({ where: { id: String(b.id), ...(ids === null ? {} : { branchId: { in: ids } }) } });
     if (!existing) return res.status(404).json({ message: "Không tìm thấy gói tập." });
-    const row = await prisma.gymPackage.update({ where: { id: existing.id }, data: { name: String(b.name ?? existing.name).trim(), durationDays: Number(b.duration ?? existing.durationDays / 30) * 30, price: Number(b.price ?? existing.price), status: b.status === "Tạm dừng" ? "INACTIVE" : "ACTIVE" } });
+    const duration = Number(b.duration ?? existing.durationDays / 30); const price = Number(b.price ?? existing.price);
+    if (!String(b.name ?? existing.name).trim() || !Number.isInteger(duration) || duration <= 0 || !Number.isFinite(price) || price < 0) return res.status(400).json({ message: "Thông tin gói tập không hợp lệ." });
+    const row = await prisma.gymPackage.update({ where: { id: existing.id }, data: { name: String(b.name ?? existing.name).trim(), durationDays: duration * 30, price, status: b.status === "Tạm dừng" ? "INACTIVE" : "ACTIVE" } });
     await cacheDelete(cacheKeys.packages("all", "all")); return res.json({ data: map(row) });
   } catch (error) { const s=(error as any)?.status;if(s)return res.status(s).json({message:(error as any).message}); return res.status(500).json({ message: "Không thể cập nhật gói tập." }); }
 });

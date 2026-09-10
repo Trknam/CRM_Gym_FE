@@ -19,7 +19,7 @@ export function LoginForm() {
 
     setLoading(true);
     try {
-      const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier, password }) });
+      const response = await fetch("/api/auth/login", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier, password }) });
       const data = await response.json();
       if (!response.ok) { setError(data.message ?? "Đăng nhập thất bại."); return; }
       window.location.href = "/";

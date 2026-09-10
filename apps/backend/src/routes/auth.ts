@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db/prisma";
 import { hashPassword, verifyPassword } from "../auth/password";
 import { isEmail, normalizePhone, validateRegister } from "../validation/auth";
-import { createSession, destroySession, getCurrentUser } from "../auth/session";
+import { clearSessionCookie, createSession, destroySession, getCurrentUser } from "../auth/session";
 
 export const authRoutes = Router();
 
@@ -42,6 +42,9 @@ authRoutes.post("/logout", async (req, res) => {
 
 authRoutes.get("/me", async (req, res) => {
   const user = await getCurrentUser(req);
-  if (!user) return res.status(401).json({ user: null });
+  if (!user) {
+    clearSessionCookie(res);
+    return res.status(401).json({ user: null, message: "UNAUTHORIZED" });
+  }
   return res.json({ user: { id: user.id, fullName: user.fullName, email: user.email, phone: user.phone, role: user.role } });
 });

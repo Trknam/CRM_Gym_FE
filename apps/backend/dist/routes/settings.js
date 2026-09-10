@@ -28,10 +28,13 @@ catch (error) {
 } });
 exports.settingsRoutes.post("/", async (req, res) => { try {
     await (0, authorization_1.requirePermission)(req, "settings.update");
-    const b = req.body ?? {}, branchId = await (0, branches_1.defaultBranchId)(req);
-    if (!String(b.name ?? "").trim())
+    const b = req.body ?? {}, branchId = await (0, branches_1.defaultBranchId)(req), name = String(b.name ?? "").trim();
+    if (!name)
         return res.status(400).json({ message: "Tên cài đặt là bắt buộc." });
-    const row = await prisma_1.prisma.gymSetting.create({ data: { branchId, name: String(b.name).trim(), value: String(b.value ?? "").trim(), group: String(b.group ?? "Hệ thống") } });
+    const duplicate = await prisma_1.prisma.gymSetting.findFirst({ where: { branchId, name } });
+    if (duplicate)
+        return res.status(409).json({ message: "Tên cài đặt đã tồn tại." });
+    const row = await prisma_1.prisma.gymSetting.create({ data: { branchId, name, value: String(b.value ?? "").trim(), group: String(b.group ?? "Hệ thống").trim() || "Hệ thống" } });
     await (0, valkey_1.cacheDelete)(keys_1.cacheKeys.settings("all"));
     return res.status(201).json({ data: out(row) });
 }
@@ -47,7 +50,13 @@ exports.settingsRoutes.patch("/", async (req, res) => { try {
     const ids = await (0, authorization_1.getAccessibleBranchIds)(req), id = String(req.body?.id ?? ""), existing = await prisma_1.prisma.gymSetting.findFirst({ where: { id, ...(ids === null ? {} : { branchId: { in: ids } }) } });
     if (!existing)
         return res.status(404).json({ message: "Không tìm thấy cài đặt." });
-    const b = req.body ?? {}, row = await prisma_1.prisma.gymSetting.update({ where: { id }, data: { name: String(b.name ?? existing.name), value: String(b.value ?? existing.value), group: String(b.group ?? existing.group) } });
+    const b = req.body ?? {}, name = String(b.name ?? existing.name).trim();
+    if (!name)
+        return res.status(400).json({ message: "Tên cài đặt là bắt buộc." });
+    const duplicate = await prisma_1.prisma.gymSetting.findFirst({ where: { branchId: existing.branchId, name, id: { not: id } } });
+    if (duplicate)
+        return res.status(409).json({ message: "Tên cài đặt đã tồn tại." });
+    const row = await prisma_1.prisma.gymSetting.update({ where: { id }, data: { name, value: String(b.value ?? existing.value).trim(), group: String(b.group ?? existing.group).trim() || "Hệ thống" } });
     await (0, valkey_1.cacheDelete)(keys_1.cacheKeys.settings("all"));
     return res.json({ data: out(row) });
 }

@@ -36,3 +36,6 @@ npm run dev
 - `data/`: mock data giai đoạn frontend
 
 Hiện tại dữ liệu vẫn là mock. PostgreSQL, API, authentication/RBAC và AI service sẽ được nối ở các bước sau.
+
+chạy lâu thì dùng: start_process tool
+chạy nhanh thì dùng: run_command tool

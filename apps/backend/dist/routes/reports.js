@@ -19,6 +19,10 @@ exports.reportsRoutes.get("/", async (req, res) => { try {
     await (0, valkey_1.cacheSet)(key, data, 30);
     return res.json({ data, cached: false });
 }
-catch {
+catch (error) {
+    const s = error?.status;
+    if (s)
+        return res.status(s).json({ message: error.message });
+    console.error("[reports] failed", error);
     return res.status(500).json({ message: "Không thể tạo báo cáo từ dữ liệu PostgreSQL." });
 } });

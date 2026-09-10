@@ -28,6 +28,10 @@ exports.trainersRoutes.post("/", async (req, res) => { try {
     const ids = await (0, authorization_1.getAccessibleBranchIds)(req), b = req.body ?? {}, name = String(b.name ?? "").trim(), email = String(b.email ?? "").trim().toLowerCase(), phone = String(b.phone ?? "").trim(), password = String(b.password ?? "");
     if (!name || !phone || !email || password.length < 8)
         return res.status(400).json({ message: "Họ tên, email, số điện thoại và mật khẩu ít nhất 8 ký tự là bắt buộc." });
+    if (!/^\S+@\S+\.\S+$/.test(email))
+        return res.status(400).json({ message: "Email Trainer không hợp lệ." });
+    if (!/^\d{9,11}$/.test(phone.replace(/\s+/g, "")))
+        return res.status(400).json({ message: "Số điện thoại Trainer không hợp lệ." });
     const branchId = await (0, branches_1.defaultBranchId)(req);
     if (!branchId)
         return res.status(400).json({ message: "Chưa có chi nhánh để gán Trainer." });
@@ -41,6 +45,9 @@ exports.trainersRoutes.post("/", async (req, res) => { try {
     return res.status(201).json({ data: out(u) });
 }
 catch (error) {
+    const s = error?.status;
+    if (s)
+        return res.status(s).json({ message: error.message });
     console.error("[trainers] create failed", error);
     return res.status(500).json({ message: "Không thể tạo PT / Trainer." });
 } });
@@ -50,14 +57,23 @@ exports.trainersRoutes.patch("/", async (req, res) => { try {
     const u = await prisma_1.prisma.user.findFirst({ where: { id, role: "TRAINER", ...(ids === null ? {} : { userBranches: { some: { branchId: { in: ids } } } }) }, include: { trainerProfile: true } });
     if (!u)
         return res.status(404).json({ message: "Không tìm thấy Trainer hoặc bạn không có quyền." });
-    const email = String(b.email ?? u.email ?? "").trim().toLowerCase(), phone = String(b.phone ?? u.phone ?? "").trim(), dup = await prisma_1.prisma.user.findFirst({ where: { id: { not: id }, OR: [{ email }, { phone }] } });
+    const email = String(b.email ?? u.email ?? "").trim().toLowerCase(), phone = String(b.phone ?? u.phone ?? "").trim();
+    if (!email || !/^\S+@\S+\.\S+$/.test(email))
+        return res.status(400).json({ message: "Email Trainer không hợp lệ." });
+    if (!phone || !/^\d{9,11}$/.test(phone.replace(/\s+/g, "")))
+        return res.status(400).json({ message: "Số điện thoại Trainer không hợp lệ." });
+    const dup = await prisma_1.prisma.user.findFirst({ where: { id: { not: id }, OR: [{ email }, { phone }] } });
     if (dup)
         return res.status(409).json({ message: "Email hoặc số điện thoại đã được sử dụng." });
     const updated = await prisma_1.prisma.user.update({ where: { id }, data: { fullName: String(b.name ?? u.fullName).trim(), email, phone, isActive: b.status === undefined ? u.isActive : b.status === "Đang hoạt động", trainerProfile: { upsert: { create: { specialty: String(b.specialty ?? "").trim() || null }, update: { specialty: String(b.specialty ?? u.trainerProfile?.specialty ?? "").trim() || null } } } }, include: { trainerProfile: true } });
     await (0, valkey_1.cacheDelete)(keys_1.cacheKeys.trainers("all"));
     return res.json({ data: out(updated) });
 }
-catch {
+catch (error) {
+    const s = error?.status;
+    if (s)
+        return res.status(s).json({ message: error.message });
+    console.error("[trainers] update failed", error);
     return res.status(500).json({ message: "Không thể cập nhật PT / Trainer." });
 } });
 exports.trainersRoutes.delete("/", async (req, res) => { try {
@@ -69,6 +85,10 @@ exports.trainersRoutes.delete("/", async (req, res) => { try {
     await (0, valkey_1.cacheDelete)(keys_1.cacheKeys.trainers("all"));
     return res.json({ message: "Đã ngừng hoạt động Trainer." });
 }
-catch {
-    return res.status(500).json({ message: "Không thể xóa PT / Trainer." });
+catch (error) {
+    const s = error?.status;
+    if (s)
+        return res.status(s).json({ message: error.message });
+    console.error("[trainers] delete failed", error);
+    return res.status(500).json({ message: "Không thể xóa Trainer." });
 } });

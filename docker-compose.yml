@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: gym-crm-postgres
     environment:
       POSTGRES_DB: gymcrm
@@ -15,6 +15,55 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  postgres-vector-init:
+    image: pgvector/pgvector:pg16
+    container_name: gym-crm-postgres-vector-init
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: gymcrm
+      PGPASSWORD: gymcrm_password
+      PGDATABASE: gymcrm
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-c", "psql -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS vector;' "]
+    restart: "no"
+
+  workout-embeddings:
+    image: ollama/ollama:0.11.10
+    container_name: gym-crm-workout-embeddings
+    volumes:
+      - workout_embeddings_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama serve & pid=$$!; until ollama list >/dev/null 2>&1; do sleep 1; done; ollama pull embeddinggemma:300m-qat-q4_0; wait $$pid"]
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list | grep -q 'embeddinggemma' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  postgres-backup:
+    image: postgres:16-alpine
+    container_name: gym-crm-postgres-backup
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: gymcrm
+      PGPASSWORD: gymcrm_password
+      PGDATABASE: gymcrm
+      BACKUP_DIR: /backups
+      BACKUP_INTERVAL_SECONDS: 86400
+      BACKUP_RETENTION_DAYS: 14
+    volumes:
+      - postgres_backups:/backups
+      - ./scripts/postgres-backup.sh:/usr/local/bin/postgres-backup.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/postgres-backup.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   valkey:
     image: valkey/valkey:8-alpine
@@ -56,14 +105,18 @@ services:
       VALKEY_URL: redis://valkey:6379
       FRONTEND_URL: http://frontend:3000
       COOKIE_SECURE: "false"
-      WORKOUT_AI_PROVIDER: ollama
-      WORKOUT_AI_MODEL: qwen2.5:7b
-      OLLAMA_URL: http://host.docker.internal:11434
+      WORKOUT_AI_PROVIDER: ollama-cloud
+      WORKOUT_AI_MODEL: gpt-oss:120b
+      OLLAMA_HOST: https://ollama.com
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+      WORKOUT_EMBEDDING_HOST: http://workout-embeddings:11434
+      WORKOUT_EMBEDDING_MODEL: embeddinggemma:300m-qat-q4_0
+      WORKOUT_EMBEDDING_DIMENSIONS: 768
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      postgres:
-        condition: service_healthy
+      postgres-vector-init:
+        condition: service_completed_successfully
       valkey:
         condition: service_started
     healthcheck:
@@ -74,4 +127,6 @@ services:
 
 volumes:
   postgres_data:
+  postgres_backups:
   valkey_data:
+  workout_embeddings_data:

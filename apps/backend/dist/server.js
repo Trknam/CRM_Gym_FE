@@ -18,6 +18,14 @@ app.get("/health", (_req, res) => res.json({ status: "ok", service: "gym-crm-bac
 (0, routes_1.registerApiRoutes)(app);
 app.use((err, _req, res, _next) => {
     if (err instanceof authorization_1.AuthError) {
+        if (err.status === 401) {
+            res.clearCookie("gymcrm_session", {
+                httpOnly: true,
+                secure: process.env.COOKIE_SECURE === "true",
+                sameSite: "lax",
+                path: "/",
+            });
+        }
         return res.status(err.status).json({ message: err.message });
     }
     console.error("Unhandled API error:", err);

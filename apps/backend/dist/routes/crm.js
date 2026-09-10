@@ -28,14 +28,20 @@ catch (error) {
 exports.crmRoutes.post("/", async (req, res) => { try {
     const user = await (0, authorization_1.requirePermission)(req, "crm.create"), b = req.body ?? {};
     const memberId = String(b.memberId ?? "").trim() || null, leadId = String(b.leadId ?? "").trim() || null;
-    const member = memberId ? await prisma_1.prisma.member.findUnique({ where: { id: memberId } }) : null;
-    const lead = leadId ? await prisma_1.prisma.lead.findUnique({ where: { id: leadId } }) : null;
-    const branchId = member?.branchId ?? lead?.branchId;
     const ids = await (0, authorization_1.getAccessibleBranchIds)(req);
-    if (!branchId || (!member && !lead))
+    const member = memberId ? await prisma_1.prisma.member.findFirst({ where: { id: memberId, ...(ids === null ? {} : { branchId: { in: ids } }) } }) : null;
+    const lead = leadId ? await prisma_1.prisma.lead.findFirst({ where: { id: leadId, ...(ids === null ? {} : { branchId: { in: ids } }) } }) : null;
+    if (memberId && !member)
+        return res.status(404).json({ message: "Không tìm thấy hội viên hoặc hội viên không thuộc phạm vi truy cập." });
+    if (leadId && !lead)
+        return res.status(404).json({ message: "Không tìm thấy Lead hoặc Lead không thuộc phạm vi truy cập." });
+    if (!member && !lead)
         return res.status(400).json({ message: "Phải chọn hội viên hoặc Lead hợp lệ." });
-    if (ids !== null && !ids.includes(branchId))
-        return res.status(403).json({ message: "Bạn không có quyền tại chi nhánh này." });
+    if (member && lead && member.branchId !== lead.branchId)
+        return res.status(400).json({ message: "Hội viên và Lead phải thuộc cùng một chi nhánh." });
+    const branchId = member?.branchId ?? lead?.branchId;
+    if (!branchId)
+        return res.status(400).json({ message: "Không xác định được chi nhánh của hoạt động CRM." });
     const row = await prisma_1.prisma.crmActivity.create({ data: { branchId, memberId: member?.id, leadId: lead?.id, createdById: user.id, type: typeMap[String(b.type)] ?? "CALL", note: String(b.note ?? "").trim() || null, status: statusMap[String(b.status)] ?? "PENDING", scheduledAt: b.date ? new Date(b.date) : null }, include });
     await (0, valkey_1.cacheDelete)(keys_1.cacheKeys.crm("all"));
     return res.status(201).json({ data: out(row) });

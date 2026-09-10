@@ -318,16 +318,17 @@ model CrmActivity {
 }
 
 model Exercise {
-  id               String            @id @default(cuid())
+  id               String             @id @default(cuid())
   name             String
   muscle           String
   equipment        String?
   level            String
   description      String?
-  isActive         Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
   workoutExercises WorkoutExercise[]
+  embedding        ExerciseEmbedding?
 
   @@index([muscle])
   @@index([level])
@@ -407,4 +408,18 @@ model WorkoutExercise {
 
   @@unique([workoutDayId, sortOrder])
   @@index([exerciseId])
+}
+
+model ExerciseEmbedding {
+  id          String                      @id @default(cuid())
+  exerciseId  String                      @unique
+  model       String
+  contentHash String
+  embedding   Unsupported("vector(1024)")
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([model])
 }

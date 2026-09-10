@@ -17,6 +17,14 @@ registerApiRoutes(app);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (err instanceof AuthError) {
+    if (err.status === 401) {
+      res.clearCookie("gymcrm_session", {
+        httpOnly: true,
+        secure: process.env.COOKIE_SECURE === "true",
+        sameSite: "lax",
+        path: "/",
+      });
+    }
     return res.status(err.status).json({ message: err.message });
   }
   console.error("Unhandled API error:", err);

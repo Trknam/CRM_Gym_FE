@@ -56,7 +56,9 @@ exports.authRoutes.post("/logout", async (req, res) => {
 });
 exports.authRoutes.get("/me", async (req, res) => {
     const user = await (0, session_1.getCurrentUser)(req);
-    if (!user)
-        return res.status(401).json({ user: null });
+    if (!user) {
+        (0, session_1.clearSessionCookie)(res);
+        return res.status(401).json({ user: null, message: "UNAUTHORIZED" });
+    }
     return res.json({ user: { id: user.id, fullName: user.fullName, email: user.email, phone: user.phone, role: user.role } });
 });
